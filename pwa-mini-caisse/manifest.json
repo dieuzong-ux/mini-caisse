@@ -1,0 +1,50 @@
+{
+  "name": "Mini Caisse — Atelier de Couture",
+  "short_name": "Mini Caisse",
+  "description": "Application de suivi de caisse journalier pour atelier de couture",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F6F9",
+  "theme_color": "#1A5276",
+  "orientation": "portrait-primary",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Nouvelle vente",
+      "short_name": "Vente",
+      "description": "Enregistrer une nouvelle vente rapidement",
+      "url": "./index.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "share_target": {
+    "action": "./index.html",
+    "method": "GET",
+    "params": {
+      "title": "libelle",
+      "text": "montant"
+    }
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+caisse",
+      "url": "./index.html?action=%s"
+    }
+  ]
+}

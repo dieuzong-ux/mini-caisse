@@ -1,0 +1,5 @@
+node_modules/
+server/serviceAccount.json
+functions/node_modules/
+pwa-mini-caisse/node_modules/
+*.log

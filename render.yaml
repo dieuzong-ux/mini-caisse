@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: mini-caisse-push-server
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false

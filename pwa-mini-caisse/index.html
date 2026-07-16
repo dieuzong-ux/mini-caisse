@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Caisse — PWA Demo</title>
+  <meta name="description" content="Suivi de caisse journalier — Application PWA de démonstration" />
+  <meta name="theme-color" content="#1A5276" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Mini Caisse" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    :root {
+      --primary: #1A5276;
+      --primary-light: #2E86AB;
+      --success: #1E8449;
+      --danger: #C0392B;
+      --warning: #D35400;
+      --bg: #F4F6F9;
+      --card: #FFFFFF;
+      --text: #2C3E50;
+      --text-light: #7F8C8D;
+      --border: #E8ECF0;
+      --radius: 12px;
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    .header { background: var(--primary); color: white; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+    .header-title { font-size: 1.2rem; font-weight: 700; }
+    .header-date  { font-size: 0.78rem; opacity: 0.8; margin-top: 2px; }
+    .offline-badge { background: var(--warning); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; display: none; }
+    .offline-badge.show { display: block; }
+
+    .install-banner { background: var(--primary-light); color: white; padding: 12px 20px; align-items: center; justify-content: space-between; gap: 12px; display: none; }
+    .install-banner.show { display: flex; }
+    .install-banner p { font-size: 0.85rem; flex: 1; }
+    .btn-install { background: white; color: var(--primary-light); border: none; padding: 8px 16px; border-radius: 20px; font-weight: 700; cursor: pointer; font-size: 0.85rem; white-space: nowrap; }
+    .btn-dismiss { background: transparent; border: none; color: white; cursor: pointer; font-size: 1.2rem; padding: 4px; }
+
+    .container { max-width: 600px; margin: 0 auto; padding: 20px 16px 40px; }
+
+    .kpi-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+    .kpi-card { background: var(--card); border-radius: var(--radius); padding: 16px 10px; text-align: center; box-shadow: var(--shadow); }
+    .kpi-label { font-size: 0.68rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .kpi-value { font-size: 1rem; font-weight: 800; }
+    .kpi-value.green { color: var(--success); }
+    .kpi-value.red   { color: var(--danger); }
+    .kpi-value.blue  { color: var(--primary); }
+
+    .form-card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 24px; }
+    .form-card h2 { font-size: 1rem; margin-bottom: 16px; color: var(--primary); }
+    .type-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab { flex: 1; padding: 10px; border: 2px solid var(--border); border-radius: 8px; background: white; cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; text-align: center; }
+    .tab.active-vente   { background: var(--success); border-color: var(--success); color: white; }
+    .tab.active-depense { background: var(--danger);  border-color: var(--danger);  color: white; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-light); margin-bottom: 4px; }
+    .form-group input { width: 100%; padding: 12px 14px; border: 2px solid var(--border); border-radius: 8px; font-size: 0.95rem; outline: none; transition: border-color 0.2s; font-family: inherit; }
+    .form-group input:focus { border-color: var(--primary-light); }
+    .btn-submit { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity 0.2s; color: white; margin-top: 4px; }
+    .btn-submit:hover  { opacity: 0.9; }
+    .btn-submit.vente  { background: var(--success); }
+    .btn-submit.depense{ background: var(--danger); }
+
+    .list-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 24px; }
+    .list-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .list-header h2 { font-size: 1rem; color: var(--primary); }
+    .btn-clear { background: none; border: 1px solid var(--border); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; color: var(--text-light); }
+    .empty-state { padding: 40px 20px; text-align: center; color: var(--text-light); }
+    .empty-icon  { font-size: 2.5rem; margin-bottom: 8px; }
+    .empty-state p { font-size: 0.9rem; }
+    .operation-item { display: flex; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); gap: 12px; animation: slideIn 0.3s ease; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    .op-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .op-icon.vente   { background: #D5F5E3; }
+    .op-icon.depense { background: #FDEDEC; }
+    .op-info { flex: 1; }
+    .op-libelle { font-size: 0.9rem; font-weight: 600; }
+    .op-time    { font-size: 0.75rem; color: var(--text-light); margin-top: 2px; }
+    .op-montant { font-size: 1rem; font-weight: 800; }
+    .op-montant.vente   { color: var(--success); }
+    .op-montant.depense { color: var(--danger); }
+    .btn-delete { background: none; border: none; color: var(--border); cursor: pointer; font-size: 1rem; padding: 4px; transition: color 0.2s; }
+    .btn-delete:hover { color: var(--danger); }
+
+    /* ---- NOTIFICATIONS PANEL ---- */
+    .notif-card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 24px; }
+    .notif-card h2 { font-size: 1rem; margin-bottom: 16px; color: var(--primary); }
+    .notif-status { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--bg); border-radius: 8px; margin-bottom: 12px; font-size: 0.85rem; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .status-dot.green  { background: var(--success); }
+    .status-dot.red    { background: var(--danger); }
+    .status-dot.orange { background: var(--warning); }
+    .notif-actions { display: flex; flex-direction: column; gap: 8px; }
+    .btn-notif { padding: 12px; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; color: white; transition: opacity 0.2s; }
+    .btn-notif:hover { opacity: 0.85; }
+    .btn-notif.blue   { background: var(--primary-light); }
+    .btn-notif.green  { background: var(--success); }
+    .btn-notif.orange { background: var(--warning); }
+    .btn-notif.red    { background: var(--danger); }
+    .btn-notif:disabled { background: var(--border); color: var(--text-light); cursor: not-allowed; }
+
+    /* ---- LAB PWA ---- */
+    .lab-card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 24px; }
+    .lab-card h2 { font-size: 1rem; margin-bottom: 16px; color: var(--primary); }
+    .lab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .lab-item { padding: 12px; background: var(--bg); border-radius: 8px; }
+    .lab-item-title { font-size: 0.75rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .lab-item-value { font-size: 0.72rem; color: var(--text-light); }
+    .badge-support { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: 700; margin-left: 4px; }
+    .badge-support.yes { background: #D5F5E3; color: var(--success); }
+    .badge-support.no  { background: #FDEDEC; color: var(--danger); }
+
+    .pwa-info { background: #EAF2FF; border-radius: var(--radius); padding: 16px 20px; border-left: 4px solid var(--primary-light); margin-bottom: 24px; }
+    .pwa-info h3 { font-size: 0.9rem; color: var(--primary); margin-bottom: 8px; }
+    .pwa-info ul { list-style: none; }
+    .pwa-info li { font-size: 0.8rem; color: var(--text); padding: 3px 0; }
+    .pwa-info li::before { content: "✓ "; color: var(--success); font-weight: bold; }
+
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--text); color: white; padding: 12px 24px; border-radius: 30px; font-size: 0.85rem; font-weight: 600; transition: transform 0.3s ease; z-index: 999; white-space: nowrap; }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <div class="header-title">💰 Mini Caisse</div>
+    <div class="header-date" id="headerDate"></div>
+  </div>
+  <div class="offline-badge" id="offlineBadge">📵 Hors-ligne</div>
+</header>
+
+<div class="install-banner" id="installBanner">
+  <p>📲 Installer l'app sur votre téléphone ?</p>
+  <button class="btn-install" id="btnInstall">Installer</button>
+  <button class="btn-dismiss" id="btnDismiss">✕</button>
+</div>
+
+<main class="container">
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Ventes</div>
+      <div class="kpi-value green" id="totalVentes">0 F</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Dépenses</div>
+      <div class="kpi-value red" id="totalDepenses">0 F</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Solde</div>
+      <div class="kpi-value blue" id="solde">0 F</div>
+    </div>
+  </div>
+
+  <div class="form-card">
+    <h2>➕ Nouvelle opération</h2>
+    <div class="type-tabs">
+      <div class="tab active-vente"  id="tabVente"   onclick="setType('vente')">🟢 Vente</div>
+      <div class="tab"               id="tabDepense" onclick="setType('depense')">🔴 Dépense</div>
+    </div>
+    <div class="form-group">
+      <label>Libellé</label>
+      <input type="text" id="libelle" placeholder="Ex: Robe wax, Fil à coudre..." />
+    </div>
+    <div class="form-group">
+      <label>Montant (FCFA)</label>
+      <input type="number" id="montant" placeholder="0" min="0" inputmode="numeric" />
+    </div>
+    <button class="btn-submit vente" id="btnSubmit" onclick="addOperation()">
+      Enregistrer la vente
+    </button>
+  </div>
+
+  <div class="list-card">
+    <div class="list-header">
+      <h2>📋 Opérations du jour</h2>
+      <button class="btn-clear" onclick="clearAll()">Tout effacer</button>
+    </div>
+    <div id="operationsList">
+      <div class="empty-state">
+        <div class="empty-icon">📭</div>
+        <p>Aucune opération enregistrée</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTIFICATIONS PANEL -->
+  <div class="notif-card">
+    <h2>🔔 Notifications Push</h2>
+    <div class="notif-status">
+      <div class="status-dot" id="notifDot"></div>
+      <span id="notifStatusText">Vérification...</span>
+    </div>
+    <div class="notif-actions">
+      <button class="btn-notif blue" id="btnRequestNotif" onclick="requestNotifPermission()">
+        🔔 Activer les notifications
+      </button>
+      <button class="btn-notif green" id="btnTestNotif" onclick="sendLocalNotif()" disabled>
+        ✅ Tester une notification locale
+      </button>
+      <button class="btn-notif orange" id="btnTestRappel" onclick="sendRappelNotif()" disabled>
+        ⏰ Simuler rappel journalier
+      </button>
+      <button class="btn-notif red" id="btnClearBadge" onclick="clearBadge()" disabled>
+        🔴 Effacer le badge (icône)
+      </button>
+    </div>
+  </div>
+
+  <!-- LAB PWA -->
+  <div class="lab-card">
+    <h2>🧪 Lab PWA — Capacités du navigateur</h2>
+    <div class="lab-grid" id="labGrid"></div>
+  </div>
+
+  <div class="pwa-info">
+    <h3>🔧 Fonctionnalités PWA actives</h3>
+    <ul>
+      <li>Fonctionne hors-ligne (données sauvegardées localement)</li>
+      <li>Installable sur mobile et bureau</li>
+      <li>Service Worker actif — ressources mises en cache</li>
+      <li>Notifications Push (Web Push API)</li>
+      <li>Background Sync — envoi différé hors-ligne</li>
+      <li>Periodic Background Sync — rappels périodiques</li>
+      <li>Badge API — compteur sur l'icône</li>
+      <li>Share Target — recevoir des partages d'autres apps</li>
+    </ul>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let currentType = 'vente';
+  let deferredPrompt = null;
+  let swRegistration = null;
+
+  // ============================================================
+  // INIT
+  // ============================================================
+  document.addEventListener('DOMContentLoaded', () => {
+    updateDate();
+    loadOperations();
+    registerServiceWorker();
+    setupOfflineDetection();
+    setupInstallPrompt();
+    checkShareTarget();
+    initLabPWA();
+  });
+
+  function updateDate() {
+    const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('headerDate').textContent =
+      new Date().toLocaleDateString('fr-FR', opts);
+  }
+
+  // ============================================================
+  // SERVICE WORKER
+  // ============================================================
+  async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      swRegistration = await navigator.serviceWorker.register('./sw.js');
+      console.log('[PWA] SW enregistré :', swRegistration.scope);
+
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data?.type === 'SYNC_DONE')    showToast('🔄 Synchronisation effectuée !');
+        if (event.data?.type === 'NOTIF_CLICKED') showToast('📬 Notification cliquée !');
+        if (event.data?.type === 'CACHE_SIZE')    showToast(`📦 Cache : ${event.data.size} fichier(s)`);
+      });
+
+      updateNotifUI();
+      registerPeriodicSync();
+      if (Notification.permission === 'granted') initFCM();
+    } catch (err) {
+      console.error('[PWA] Erreur SW :', err);
+    }
+  }
+
+  // ============================================================
+  // OFFLINE
+  // ============================================================
+  function setupOfflineDetection() {
+    const badge = document.getElementById('offlineBadge');
+    const update = () => {
+      badge.classList.toggle('show', !navigator.onLine);
+      if (!navigator.onLine) {
+        showToast('📵 Hors-ligne — données sauvegardées localement');
+        triggerBackgroundSync();
+      }
+    };
+    window.addEventListener('online',  update);
+    window.addEventListener('offline', update);
+    update();
+  }
+
+  // ============================================================
+  // INSTALL PROMPT
+  // ============================================================
+  function setupInstallPrompt() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('installBanner').classList.add('show');
+    });
+
+    document.getElementById('btnInstall').addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById('installBanner').classList.remove('show');
+      if (outcome === 'accepted') showToast('✅ Application installée !');
+    });
+
+    document.getElementById('btnDismiss').addEventListener('click', () => {
+      document.getElementById('installBanner').classList.remove('show');
+    });
+
+    window.addEventListener('appinstalled', () => {
+      showToast('🎉 App installée avec succès !');
+      document.getElementById('installBanner').classList.remove('show');
+    });
+  }
+
+  // ============================================================
+  // SHARE TARGET — Pré-remplir le formulaire si partagé depuis une autre app
+  // ============================================================
+  function checkShareTarget() {
+    const params = new URLSearchParams(window.location.search);
+    const libelle = params.get('libelle') || params.get('title');
+    const montant = params.get('montant') || params.get('text');
+    if (libelle) document.getElementById('libelle').value = libelle;
+    if (montant && !isNaN(parseFloat(montant))) document.getElementById('montant').value = parseFloat(montant);
+    if (libelle || montant) showToast('📤 Données reçues via partage !');
+  }
+
+  // ============================================================
+  // NOTIFICATIONS
+  // ============================================================
+  function updateNotifUI() {
+    const dot  = document.getElementById('notifDot');
+    const text = document.getElementById('notifStatusText');
+    const btnReq  = document.getElementById('btnRequestNotif');
+    const btnTest = document.getElementById('btnTestNotif');
+    const btnRappel = document.getElementById('btnTestRappel');
+    const btnBadge  = document.getElementById('btnClearBadge');
+
+    if (!('Notification' in window)) {
+      dot.className = 'status-dot red';
+      text.textContent = '❌ Notifications non supportées par ce navigateur';
+      btnReq.disabled = true;
+      return;
+    }
+
+    const perm = Notification.permission;
+    if (perm === 'granted') {
+      dot.className = 'status-dot green';
+      text.textContent = '✅ Notifications activées';
+      btnReq.disabled = true;
+      btnTest.disabled = false;
+      btnRappel.disabled = false;
+      btnBadge.disabled = false;
+    } else if (perm === 'denied') {
+      dot.className = 'status-dot red';
+      text.textContent = '🚫 Notifications bloquées — à débloquer dans les paramètres du navigateur';
+      btnReq.disabled = true;
+    } else {
+      dot.className = 'status-dot orange';
+      text.textContent = '⏳ Permission non encore accordée';
+    }
+  }
+
+  async function requestNotifPermission() {
+    if (!('Notification' in window)) return showToast('❌ Non supporté');
+    const perm = await Notification.requestPermission();
+    updateNotifUI();
+    if (perm === 'granted') { showToast('✅ Notifications activées !'); initFCM(); }
+    else showToast('🚫 Permission refusée');
+  }
+
+  async function sendLocalNotif() {
+    if (!swRegistration) return showToast('❌ Service Worker non prêt');
+    const ops = getOperations();
+    const ventes = ops.filter(o => o.type === 'vente').reduce((s, o) => s + o.montant, 0);
+    await swRegistration.showNotification('💰 Mini Caisse', {
+      body: `Ventes du jour : ${ventes.toLocaleString('fr-FR')} F CFA`,
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
+      vibrate: [200, 100, 200],
+      tag: 'test-local',
+      actions: [
+        { action: 'open', title: '📂 Ouvrir' },
+        { action: 'dismiss', title: '✕ Ignorer' }
+      ]
+    });
+    if ('setAppBadge' in navigator) navigator.setAppBadge(ops.length).catch(() => {});
+    showToast('🔔 Notification envoyée !');
+  }
+
+  async function sendRappelNotif() {
+    if (!swRegistration) return showToast('❌ Service Worker non prêt');
+    await swRegistration.showNotification('📊 Mini Caisse — Rappel', {
+      body: "N'oubliez pas de saisir vos opérations du jour !",
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
+      vibrate: [100, 50, 100],
+      tag: 'rappel-journalier'
+    });
+    showToast('⏰ Rappel journalier simulé !');
+  }
+
+  function clearBadge() {
+    if ('clearAppBadge' in navigator) {
+      navigator.clearAppBadge().catch(() => {});
+      showToast('🔴 Badge effacé');
+    } else {
+      showToast('❌ Badge API non supportée');
+    }
+    if (swRegistration) {
+      navigator.serviceWorker.controller?.postMessage({ type: 'CLEAR_BADGE' });
+    }
+  }
+
+  // ============================================================
+  // BACKGROUND SYNC
+  // ============================================================
+  async function triggerBackgroundSync() {
+    if (!swRegistration || !('sync' in swRegistration)) return;
+    try {
+      await swRegistration.sync.register('sync-operations');
+      showToast('🔄 Sync programmée pour quand vous serez en ligne');
+    } catch (e) {
+      console.warn('[PWA] Background Sync non supporté :', e);
+    }
+  }
+
+  // ============================================================
+  // PERIODIC BACKGROUND SYNC
+  // ============================================================
+  async function registerPeriodicSync() {
+    if (!swRegistration || !('periodicSync' in swRegistration)) return;
+    try {
+      const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
+      if (status.state === 'granted') {
+        await swRegistration.periodicSync.register('daily-reminder', { minInterval: 24 * 60 * 60 * 1000 });
+        console.log('[PWA] Periodic Sync enregistré');
+      }
+    } catch (e) {
+      console.warn('[PWA] Periodic Sync non supporté :', e);
+    }
+  }
+
+  // ============================================================
+  // LAB PWA — Détection des capacités
+  // ============================================================
+  function initLabPWA() {
+    const features = [
+      { title: 'Service Worker',       value: 'serviceWorker' in navigator },
+      { title: 'Notifications Push',   value: 'Notification' in window },
+      { title: 'Background Sync',      value: 'SyncManager' in window },
+      { title: 'Periodic Sync',        value: 'PeriodicSyncManager' in window },
+      { title: 'Badge API',            value: 'setAppBadge' in navigator },
+      { title: 'Share API',            value: 'share' in navigator },
+      { title: 'Clipboard API',        value: 'clipboard' in navigator },
+      { title: 'Geolocation',          value: 'geolocation' in navigator },
+      { title: 'Camera / Micro',       value: 'mediaDevices' in navigator },
+      { title: 'Bluetooth (Web BT)',   value: 'bluetooth' in navigator },
+      { title: 'NFC (Web NFC)',        value: 'NDEFReader' in window },
+      { title: 'IndexedDB',            value: 'indexedDB' in window },
+      { title: 'Cache Storage',        value: 'caches' in window },
+      { title: 'Web Workers',          value: 'Worker' in window },
+      { title: 'Offline détecté',      value: !navigator.onLine ? 'Oui (hors-ligne)' : 'Non (en ligne)' },
+      { title: 'Mode standalone',      value: window.matchMedia('(display-mode: standalone)').matches ? 'Oui (installée)' : 'Non (navigateur)' },
+    ];
+
+    const grid = document.getElementById('labGrid');
+    grid.innerHTML = features.map(f => {
+      const val = typeof f.value === 'boolean' ? f.value : f.value;
+      const supported = typeof val === 'boolean' ? val : true;
+      const label = typeof val === 'boolean' ? (val ? 'Supporté' : 'Non supporté') : val;
+      return `
+        <div class="lab-item">
+          <div class="lab-item-title">${f.title} <span class="badge-support ${supported ? 'yes' : 'no'}">${label}</span></div>
+        </div>`;
+    }).join('');
+  }
+
+  // ============================================================
+  // CAISSE — OPÉRATIONS
+  // ============================================================
+  function setType(type) {
+    currentType = type;
+    document.getElementById('tabVente').className   = 'tab' + (type === 'vente'   ? ' active-vente'   : '');
+    document.getElementById('tabDepense').className = 'tab' + (type === 'depense' ? ' active-depense' : '');
+    const btn = document.getElementById('btnSubmit');
+    btn.className   = `btn-submit ${type}`;
+    btn.textContent = type === 'vente' ? 'Enregistrer la vente' : 'Enregistrer la dépense';
+    document.getElementById('libelle').placeholder =
+      type === 'vente' ? 'Ex: Robe wax, Pantalon...' : 'Ex: Fil, Boutons, Transport...';
+  }
+
+  function addOperation() {
+    const libelle = document.getElementById('libelle').value.trim();
+    const montant = parseFloat(document.getElementById('montant').value);
+    if (!libelle)            { showToast('⚠️ Veuillez saisir un libellé'); return; }
+    if (!montant || montant <= 0) { showToast('⚠️ Montant invalide');      return; }
+
+    const op = {
+      id: Date.now(), type: currentType, libelle, montant,
+      heure: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    };
+    const ops = getOperations();
+    ops.unshift(op);
+    saveOperations(ops);
+    document.getElementById('libelle').value = '';
+    document.getElementById('montant').value = '';
+    renderOperations(ops);
+    updateKPIs(ops);
+    const emoji = currentType === 'vente' ? '💵' : '💸';
+    const label = currentType === 'vente' ? 'Nouvelle vente' : 'Nouvelle dépense';
+    showToast(currentType === 'vente' ? '✅ Vente enregistrée !' : '✅ Dépense enregistrée !');
+    notifyAll(`${emoji} ${label}`, `${op.libelle} — ${op.montant.toLocaleString('fr-FR')} F CFA`);
+  }
+
+  function deleteOperation(id) {
+    const ops = getOperations().filter(o => o.id !== id);
+    saveOperations(ops);
+    renderOperations(ops);
+    updateKPIs(ops);
+    showToast('🗑️ Opération supprimée');
+  }
+
+  function clearAll() {
+    if (!confirm('Effacer toutes les opérations du jour ?')) return;
+    saveOperations([]);
+    renderOperations([]);
+    updateKPIs([]);
+    showToast('🗑️ Tout a été effacé');
+  }
+
+  function getOperations() {
+    try { return JSON.parse(localStorage.getItem('mini_caisse_ops') || '[]'); }
+    catch { return []; }
+  }
+  function saveOperations(ops) { localStorage.setItem('mini_caisse_ops', JSON.stringify(ops)); }
+  function loadOperations() { const ops = getOperations(); renderOperations(ops); updateKPIs(ops); }
+
+  function renderOperations(operations) {
+    const el = document.getElementById('operationsList');
+    if (!operations.length) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>Aucune opération enregistrée</p></div>`;
+      return;
+    }
+    el.innerHTML = operations.map(op => `
+      <div class="operation-item">
+        <div class="op-icon ${op.type}">${op.type === 'vente' ? '💵' : '💸'}</div>
+        <div class="op-info">
+          <div class="op-libelle">${escHtml(op.libelle)}</div>
+          <div class="op-time">${op.heure}</div>
+        </div>
+        <div class="op-montant ${op.type}">${op.type === 'vente' ? '+' : '-'}${op.montant.toLocaleString('fr-FR')} F</div>
+        <button class="btn-delete" onclick="deleteOperation(${op.id})">✕</button>
+      </div>`).join('');
+  }
+
+  function updateKPIs(ops) {
+    const ventes   = ops.filter(o => o.type === 'vente').reduce((s, o) => s + o.montant, 0);
+    const depenses = ops.filter(o => o.type === 'depense').reduce((s, o) => s + o.montant, 0);
+    const solde    = ventes - depenses;
+    document.getElementById('totalVentes').textContent   = fmt(ventes);
+    document.getElementById('totalDepenses').textContent = fmt(depenses);
+    const el = document.getElementById('solde');
+    el.textContent = fmt(solde);
+    el.className   = 'kpi-value ' + (solde >= 0 ? 'green' : 'red');
+  }
+
+  function fmt(n) { return n.toLocaleString('fr-FR') + ' F'; }
+  function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ============================================================
+  // FIREBASE FCM — Notifications Push réelles
+  // ============================================================
+  const FUNCTIONS_BASE = 'https://us-central1-pwa-test-fcb50.cloudfunctions.net';
+  const VAPID_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDkBWseIkuokgq4XOm9HGcW-7He_4KeElBsappFcmaog';
+
+  async function initFCM() {
+    try {
+      const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+      const { getMessaging, getToken, onMessage } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js');
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyAQPhQBktgdehLlarrGDO3njlF_gtBx6OM",
+        authDomain: "pwa-test-fcb50.firebaseapp.com",
+        projectId: "pwa-test-fcb50",
+        storageBucket: "pwa-test-fcb50.firebasestorage.app",
+        messagingSenderId: "196477051317",
+        appId: "1:196477051317:web:8f384291df3de1f9ef39fc"
+      };
+
+      const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+      const messaging = getMessaging(app);
+
+      const token = await getToken(messaging, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: swRegistration
+      });
+
+      if (token) {
+        console.log('[FCM] Token :', token);
+        await fetch(`${FUNCTIONS_BASE}/saveToken`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        showToast('🔔 Abonné aux notifications push !');
+      }
+
+      onMessage(messaging, (payload) => {
+        showToast('📩 ' + (payload.notification?.body || 'Message reçu'));
+      });
+
+    } catch (err) {
+      console.warn('[FCM] Erreur init :', err);
+    }
+  }
+
+  // Envoyer un push à tous les abonnés via Cloud Function
+  async function notifyAll(title, body) {
+    try {
+      await fetch(`${FUNCTIONS_BASE}/sendPushToAll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, body })
+      });
+    } catch (e) {
+      console.warn('[FCM] Erreur envoi push :', e);
+    }
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+  }
+</script>
+</body>
+</html>
