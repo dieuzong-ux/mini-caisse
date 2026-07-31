@@ -2,7 +2,7 @@
 // SERVICE WORKER — Mini Caisse PWA (v4 - full features)
 // ============================================================
 
-const CACHE_NAME = 'mini-caisse-v5';
+const CACHE_NAME = 'mini-caisse-v6';
 
 const ASSETS_TO_PRECACHE = [
   './index.html',
@@ -108,6 +108,7 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'dismiss') return;
 
+  // Que ce soit clic sur 'open' ou clic direct sur la notif
   const url = event.notification.data?.url || 'https://pwa-test-fcb50.web.app/#operations';
 
   event.waitUntil(
