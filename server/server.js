@@ -39,7 +39,6 @@ app.post('/send-push', async (req, res) => {
 
   const tokenList = Array.from(tokens);
   const message = {
-    notification: { title, body },
     webpush: {
       notification: {
         title, body,
@@ -51,7 +50,8 @@ app.post('/send-push', async (req, res) => {
           { action: 'dismiss', title: '✕ Ignorer' }
         ]
       },
-      fcmOptions: { link: url || 'https://pwa-test-fcb50.web.app' }
+      data: { url: url || 'https://pwa-test-fcb50.web.app/#operations' },
+      fcmOptions: { link: url || 'https://pwa-test-fcb50.web.app/#operations' }
     },
     tokens: tokenList
   };

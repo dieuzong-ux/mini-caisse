@@ -68,26 +68,31 @@ self.addEventListener('fetch', (event) => {
 // PUSH — Notification push depuis serveur (FCM / VAPID)
 // ============================================================
 self.addEventListener('push', (event) => {
-  let data = { title: 'Mini Caisse', body: 'Nouvelle notification', icon: './icons/icon-192.png' };
+  let title = 'Mini Caisse';
+  let body = 'Nouvelle notification';
+  let url = 'https://pwa-test-fcb50.web.app/#operations';
 
   if (event.data) {
-    try { data = { ...data, ...event.data.json() }; }
-    catch { data.body = event.data.text(); }
+    try {
+      const d = event.data.json();
+      title = d.notification?.title || d.title || title;
+      body  = d.notification?.body  || d.body  || body;
+      url   = d.data?.url || d.url || url;
+    } catch { body = event.data.text() || body; }
   }
 
-  // Badge API — affiche un compteur sur l'icône de l'app
-  if ('setAppBadge' in navigator) navigator.setAppBadge(1).catch(() => {});
+  if ('setAppBadge' in self.navigator) self.navigator.setAppBadge(1).catch(() => {});
 
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon || './icons/icon-192.png',
+    self.registration.showNotification(title, {
+      body,
+      icon: './icons/icon-192.png',
       badge: './icons/icon-192.png',
       vibrate: [200, 100, 200],
-      tag: data.tag || 'mini-caisse-notif',
+      tag: 'mini-caisse-notif',
       renotify: true,
-      data: { url: data.url || './' },
-      actions: data.actions || [
+      data: { url },
+      actions: [
         { action: 'open', title: '📂 Ouvrir' },
         { action: 'dismiss', title: '✕ Ignorer' }
       ]
