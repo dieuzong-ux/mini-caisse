@@ -141,6 +141,14 @@
   <button class="btn-dismiss" id="btnDismiss">✕</button>
 </div>
 
+<div class="install-banner" id="iosBanner" style="background:#5D4037;flex-direction:column;align-items:flex-start;gap:6px;">
+  <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+    <p style="font-weight:700;">📲 Installer sur iPhone</p>
+    <button class="btn-dismiss" id="iosDismiss">✕</button>
+  </div>
+  <p style="font-size:0.8rem;opacity:0.95;">Appuyez sur <strong>⎙ Partager</strong> puis <strong>« Sur l'écran d'accueil »</strong></p>
+</div>
+
 <main class="container">
 
   <div class="kpi-grid">
@@ -175,6 +183,14 @@
     <button class="btn-submit vente" id="btnSubmit" onclick="addOperation()">
       Enregistrer la vente
     </button>
+  </div>
+
+  <div class="list-card" id="operations">
+    <div class="list-header">
+      <h2>💻 Opérations partagées</h2>
+      <button class="btn-clear" onclick="loadSharedOperations()">&#x21bb; Actualiser</button>
+    </div>
+    <div id="sharedList"><div class="empty-state"><div class="empty-icon">🌐</div><p>Aucune opération partagée</p></div></div>
   </div>
 
   <div class="list-card">
@@ -248,6 +264,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     updateDate();
     loadOperations();
+    loadSharedOperations();
     registerServiceWorker();
     setupOfflineDetection();
     setupInstallPrompt();
@@ -272,7 +289,15 @@
 
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data?.type === 'SYNC_DONE')    showToast('🔄 Synchronisation effectuée !');
-        if (event.data?.type === 'NOTIF_CLICKED') showToast('📬 Notification cliquée !');
+        if (event.data?.type === 'NOTIF_CLICKED') {
+          showToast('📬 Notification cliquée !');
+          const hash = event.data.url?.split('#')[1];
+          if (hash) {
+            loadSharedOperations().then(() => {
+              document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
+            });
+          }
+        }
         if (event.data?.type === 'CACHE_SIZE')    showToast(`📦 Cache : ${event.data.size} fichier(s)`);
       });
 
@@ -305,6 +330,17 @@
   // INSTALL PROMPT
   // ============================================================
   function setupInstallPrompt() {
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
+    if (isIOS && !isStandalone) {
+      document.getElementById('iosBanner').classList.add('show');
+      document.getElementById('iosDismiss').addEventListener('click', () => {
+        document.getElementById('iosBanner').classList.remove('show');
+      });
+      return;
+    }
+
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
@@ -527,7 +563,8 @@
     const emoji = currentType === 'vente' ? '💵' : '💸';
     const label = currentType === 'vente' ? 'Nouvelle vente' : 'Nouvelle dépense';
     showToast(currentType === 'vente' ? '✅ Vente enregistrée !' : '✅ Dépense enregistrée !');
-    notifyAll(`${emoji} ${label}`, `${op.libelle} — ${op.montant.toLocaleString('fr-FR')} F CFA`);
+    notifyAll(`${emoji} ${label}`, `${op.libelle} — ${op.montant.toLocaleString('fr-FR')} F CFA`, 'https://pwa-test-fcb50.web.app/#operations');
+    shareOperation(op);
   }
 
   function deleteOperation(id) {
@@ -588,8 +625,8 @@
   // ============================================================
   // FIREBASE FCM — Notifications Push réelles
   // ============================================================
-  const FUNCTIONS_BASE = 'https://us-central1-pwa-test-fcb50.cloudfunctions.net';
-  const VAPID_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDkBWseIkuokgq4XOm9HGcW-7He_4KeElBsappFcmaog';
+  const FUNCTIONS_BASE = 'https://mini-caisse.onrender.com';
+  const VAPID_KEY = 'BLQPP92kx6agPlcK6iUM2Wy6IrZDdntj-XnnoVFkJ7i0_X73MHtKgzxKU0cRkaQN-BGxYSGTCqb4XnfEhbsjUVo';
 
   async function initFCM() {
     try {
@@ -615,7 +652,7 @@
 
       if (token) {
         console.log('[FCM] Token :', token);
-        await fetch(`${FUNCTIONS_BASE}/saveToken`, {
+        await fetch(`${FUNCTIONS_BASE}/save-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token })
@@ -633,15 +670,50 @@
   }
 
   // Envoyer un push à tous les abonnés via Cloud Function
-  async function notifyAll(title, body) {
+  async function notifyAll(title, body, url) {
     try {
-      await fetch(`${FUNCTIONS_BASE}/sendPushToAll`, {
+      await fetch(`${FUNCTIONS_BASE}/send-push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, body })
+        body: JSON.stringify({ title, body, url })
       });
     } catch (e) {
       console.warn('[FCM] Erreur envoi push :', e);
+    }
+  }
+
+  async function shareOperation(op) {
+    try {
+      await fetch(`${FUNCTIONS_BASE}/operation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...op, auteur: localStorage.getItem('pseudo') || 'Moi' })
+      });
+    } catch (e) {
+      console.warn('[SERVER] Erreur partage op :', e);
+    }
+  }
+
+  async function loadSharedOperations() {
+    try {
+      const res = await fetch(`${FUNCTIONS_BASE}/operations`);
+      const ops = await res.json();
+      const el = document.getElementById('sharedList');
+      if (!ops.length) {
+        el.innerHTML = '<div class="empty-state"><div class="empty-icon">🌐</div><p>Aucune opération partagée</p></div>';
+        return;
+      }
+      el.innerHTML = ops.map(op => `
+        <div class="operation-item">
+          <div class="op-icon ${op.type}">${op.type === 'vente' ? '💵' : '💸'}</div>
+          <div class="op-info">
+            <div class="op-libelle">${escHtml(op.libelle)} <span style="font-size:0.7rem;color:var(--text-light)">— ${escHtml(op.auteur)}</span></div>
+            <div class="op-time">${op.heure || ''}</div>
+          </div>
+          <div class="op-montant ${op.type}">${op.type === 'vente' ? '+' : '-'}${Number(op.montant).toLocaleString('fr-FR')} F</div>
+        </div>`).join('');
+    } catch (e) {
+      console.warn('[SERVER] Erreur chargement ops :', e);
     }
   }
 

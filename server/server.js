@@ -18,8 +18,9 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 
-// Stockage des tokens en mémoire
+// Stockage en mémoire
 const tokens = new Set();
+const operations = [];
 
 // POST /save-token
 app.post('/save-token', (req, res) => {
@@ -76,6 +77,20 @@ app.post('/send-push', async (req, res) => {
 
 app.get('/subscribers', (req, res) => res.json({ count: tokens.size }));
 app.get('/', (req, res) => res.json({ status: 'ok', subscribers: tokens.size }));
+
+// GET /operations
+app.get('/operations', (req, res) => res.json(operations));
+
+// POST /operation
+app.post('/operation', async (req, res) => {
+  const { id, type, libelle, montant, heure, auteur } = req.body;
+  if (!type || !libelle || !montant) return res.status(400).json({ error: 'Champs manquants' });
+  const op = { id: id || Date.now(), type, libelle, montant, heure, auteur: auteur || 'Inconnu', createdAt: new Date().toISOString() };
+  operations.unshift(op);
+  if (operations.length > 200) operations.pop();
+  console.log(`[OP] ${auteur} — ${type} : ${libelle} ${montant}`);
+  res.json({ success: true });
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`[SERVER] Push server démarré sur le port ${PORT}`));
